@@ -742,8 +742,8 @@
             <input type="text" id="searchInput" placeholder="Tìm kiếm game...">
         </div>
         <div class="nav-actions">
-            <!-- Nút Đăng Game Mới -->
-            <button class="btn btn-primary" id="openUploadModal"><i class="fa-solid fa-plus"></i> Đăng Game Mới</button>
+            <!-- Nút Đăng Game Mới (Mặc định ẩn, chỉ hiện khi đăng nhập admin) -->
+            <button class="btn btn-primary" id="openUploadModal" onclick="openUploadModalFunc()" style="display: none;"><i class="fa-solid fa-plus"></i> Đăng Game Mới</button>
             
             <!-- Khu vực tài khoản (Chưa đăng nhập) -->
             <button class="btn btn-outline" id="openAuthModalBtn" onclick="openAuthModal('login')"><i class="fa-solid fa-user"></i> Đăng Nhập</button>
@@ -885,10 +885,10 @@
         <p>&copy; 2026 KuroG18. Nền tảng chia sẻ game cộng đồng.</p>
     </footer>
 
-    <!-- Khởi tạo Firebase và toàn bộ logic xử lý gom chung vào một module -->
+    <!-- Khởi tạo Firebase và quản lý quyền Admin -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyCgu-00ZXILANFFdH9cQ_VrZRaNm-ywA4",
@@ -973,9 +973,17 @@
                 openAuthModalBtn.style.display = 'none';
                 userAccountSection.style.display = 'flex';
                 userNameDisplay.textContent = currentUser.email.split('@')[0];
+                
+                // Chỉ hiện nút Đăng Game Mới khi tài khoản là Admin
+                if (currentUser.role === 'admin') {
+                    openUploadModal.style.display = 'inline-flex';
+                } else {
+                    openUploadModal.style.display = 'none';
+                }
             } else {
                 openAuthModalBtn.style.display = 'inline-flex';
                 userAccountSection.style.display = 'none';
+                openUploadModal.style.display = 'none'; // Ẩn khi chưa đăng nhập
             }
         }
 
@@ -1051,6 +1059,14 @@
             alert("Đã đăng xuất!");
         };
 
+        window.openUploadModalFunc = function() {
+            if (!currentUser || currentUser.role !== 'admin') {
+                alert("Chỉ tài khoản Admin mới có quyền đăng game!");
+                return;
+            }
+            uploadModal.style.display = 'flex';
+        };
+
         window.addDownloadLinkRow = function() {
             const container = document.getElementById('downloadLinksContainer');
             const row = document.createElement('div');
@@ -1078,14 +1094,28 @@
 
         window.handleEditorImageUpload = function(event) {
             const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const imgHtml = `<img src="${e.target.result}" alt="Image" />`;
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = scaleSize < 1 ? MAX_WIDTH : img.width;
+                    canvas.height = scaleSize < 1 ? img.height * scaleSize : img.height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    const imgHtml = `<img src="${compressedDataUrl}" alt="Image" />`;
                     document.execCommand('insertHTML', false, imgHtml);
-                };
-                reader.readAsDataURL(file);
-            }
+                }
+            };
+            reader.readAsDataURL(file);
             event.target.value = '';
         };
 
@@ -1108,7 +1138,7 @@
                 }
 
                 card.innerHTML = `
-                    <img src="${game.image}" alt="${game.title}" class="game-thumbnail">
+                    <img src="${game.image}" alt="${game.title}" class="game-thumbnail" loading="lazy">
                     <div class="game-info">
                         <h3 class="game-title">${game.title}</h3>
                         <p class="game-desc">${game.shortDesc}</p>
@@ -1139,7 +1169,7 @@
                 console.error(err);
             }
 
-            if (currentUser) {
+            if (currentUser && currentUser.role === 'admin') {
                 deleteGameBtn.style.display = 'inline-flex';
                 deleteGameBtn.onclick = () => deleteGame(game.id);
             } else {
@@ -1261,9 +1291,8 @@
         window.openGameDetail = openGameDetail;
 
         async function deleteGame(gameId) {
-            if (!currentUser) {
-                alert("Bạn cần đăng nhập để thực hiện hành động này!");
-                openAuthModal('login');
+            if (!currentUser || currentUser.role !== 'admin') {
+                alert("Bạn không có quyền thực hiện hành động này!");
                 return;
             }
 
@@ -1366,14 +1395,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
-        openUploadModal.addEventListener('click', () => { 
-            if (!currentUser) {
-                alert("Bạn vui lòng đăng nhập hoặc đăng ký tài khoản trước khi đăng game!");
-                openAuthModal('login');
-                return;
-            }
-            uploadModal.style.display = 'flex'; 
-        });
         closeModal.addEventListener('click', () => { uploadModal.style.display = 'none'; });
         window.addEventListener('click', (e) => { 
             if (e.target === uploadModal) { uploadModal.style.display = 'none'; }
@@ -1384,6 +1405,11 @@
         uploadForm.addEventListener('submit', (e) => {
             e.preventDefault();
 
+            if (!currentUser || currentUser.role !== 'admin') {
+                alert("Bạn không có quyền đăng bài!");
+                return;
+            }
+
             const imageFileInput = document.getElementById('gameImageFile');
             const file = imageFileInput.files[0];
 
@@ -1392,61 +1418,69 @@
                 return;
             }
 
-            if (file.size > 800 * 1024) {
-                alert("Ảnh quá lớn! Vui lòng chọn ảnh dung lượng dưới 800KB để tránh lỗi lưu trữ Firestore.");
-                return;
-            }
-
             const reader = new FileReader();
             reader.onload = async function(event) {
-                const mainImageBase64 = event.target.result;
-                const htmlContent = wpEditor.innerHTML;
-                
-                let linksArray = [];
-                const linkRows = document.querySelectorAll('.link-row');
-                linkRows.forEach(row => {
-                    const platform = row.querySelector('.platform-select').value;
-                    const name = row.querySelector('.server-name').value;
-                    const url = row.querySelector('.server-url').value;
-                    if(name && url) {
-                        linksArray.push({ platform, name, url });
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = async function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 600;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = scaleSize < 1 ? MAX_WIDTH : img.width;
+                    canvas.height = scaleSize < 1 ? img.height * scaleSize : img.height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const mainImageBase64 = canvas.toDataURL('image/jpeg', 0.75);
+
+                    const htmlContent = wpEditor.innerHTML;
+                    
+                    let linksArray = [];
+                    const linkRows = document.querySelectorAll('.link-row');
+                    linkRows.forEach(row => {
+                        const platform = row.querySelector('.platform-select').value;
+                        const name = row.querySelector('.server-name').value;
+                        const url = row.querySelector('.server-url').value;
+                        if(name && url) {
+                            linksArray.push({ platform, name, url });
+                        }
+                    });
+
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = htmlContent;
+                    const plainTextDesc = tempDiv.textContent || tempDiv.innerText || "";
+
+                    const now = new Date();
+                    const day = String(now.getDate()).padStart(2, '0');
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const year = now.getFullYear();
+                    const formattedDate = `${day}/${month}/${year}`;
+
+                    const newGame = {
+                        id: Date.now(),
+                        title: document.getElementById('gameTitle').value,
+                        image: mainImageBase64,
+                        downloadLinks: linksArray,
+                        shortDesc: plainTextDesc.substring(0, 100) + '...',
+                        fullHtmlContent: htmlContent,
+                        views: 0,
+                        uploadDate: formattedDate,
+                        ratings: [],
+                        comments: []
+                    };
+
+                    try {
+                        await addDoc(collection(db, "games"), newGame);
+                        alert("Đăng bài lên website thành công!");
+                        uploadForm.reset();
+                        wpEditor.innerHTML = '';
+                        uploadModal.style.display = 'none';
+                        loadGamesFromFirestore();
+                    } catch (error) {
+                        console.error("Lỗi khi đăng game:", error);
+                        alert("Lỗi khi đăng game: " + error.message);
                     }
-                });
-
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = htmlContent;
-                const plainTextDesc = tempDiv.textContent || tempDiv.innerText || "";
-
-                const now = new Date();
-                const day = String(now.getDate()).padStart(2, '0');
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const year = now.getFullYear();
-                const formattedDate = `${day}/${month}/${year}`;
-
-                const newGame = {
-                    id: Date.now(),
-                    title: document.getElementById('gameTitle').value,
-                    image: mainImageBase64,
-                    downloadLinks: linksArray,
-                    shortDesc: plainTextDesc.substring(0, 100) + '...',
-                    fullHtmlContent: htmlContent,
-                    views: 0,
-                    uploadDate: formattedDate,
-                    ratings: [],
-                    comments: []
                 };
-
-                try {
-                    await addDoc(collection(db, "games"), newGame);
-                    alert("Đăng bài lên website thành công!");
-                    uploadForm.reset();
-                    wpEditor.innerHTML = '';
-                    uploadModal.style.display = 'none';
-                    loadGamesFromFirestore();
-                } catch (error) {
-                    console.error("Lỗi khi đăng game:", error);
-                    alert("Lỗi khi đăng game: " + error.message);
-                }
             };
             reader.readAsDataURL(file);
         });

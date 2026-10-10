@@ -885,7 +885,7 @@
         <p>&copy; 2026 KuroG18. Nền tảng chia sẻ game cộng đồng.</p>
     </footer>
 
-    <!-- Firebase SDK và Logic xử lý gom chung -->
+    <!-- Khởi tạo Firebase và toàn bộ logic xử lý gom chung vào một module -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-app.js";
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-firestore.js";
@@ -903,21 +903,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        window.db = db;
-        window.collection = collection;
-        window.addDoc = addDoc;
-        window.getDocs = getDocs;
-        window.deleteDoc = deleteDoc;
-        window.doc = doc;
-        window.updateDoc = updateDoc;
-
-        // Tải danh sách game ngay khi khởi động
-        if (typeof window.loadGamesFromFirestore === 'function') {
-            window.loadGamesFromFirestore();
-        }
-    </script>
-
-    <script>
         let games = [];
         let users = JSON.parse(localStorage.getItem('kuro_users')) || [
             { email: "admin@gmail.com", password: "1234567890!@#$%^&*()", role: "admin" }
@@ -955,10 +940,7 @@
 
         async function loadGamesFromFirestore() {
             try {
-                while (!window.db || !window.getDocs) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-                const querySnapshot = await window.getDocs(window.collection(window.db, "games"));
+                const querySnapshot = await getDocs(collection(db, "games"));
                 games = [];
                 querySnapshot.forEach((docSnap) => {
                     games.push({ firestoreId: docSnap.id, ...docSnap.data() });
@@ -970,8 +952,9 @@
             }
         }
         window.loadGamesFromFirestore = loadGamesFromFirestore;
+        loadGamesFromFirestore();
 
-        function togglePasswordVisibility(inputId, btn) {
+        window.togglePasswordVisibility = function(inputId, btn) {
             const input = document.getElementById(inputId);
             const icon = btn.querySelector('i');
             if (input.type === 'password') {
@@ -983,7 +966,7 @@
                 icon.classList.remove('fa-eye-slash');
                 icon.classList.add('fa-eye');
             }
-        }
+        };
 
         function updateAuthUI() {
             if (currentUser) {
@@ -996,16 +979,16 @@
             }
         }
 
-        function openAuthModal(tab = 'login') {
+        window.openAuthModal = function(tab = 'login') {
             authModal.style.display = 'flex';
             switchAuthTab(tab);
-        }
+        };
 
-        function closeAuthModal() {
+        window.closeAuthModal = function() {
             authModal.style.display = 'none';
-        }
+        };
 
-        function switchAuthTab(tab) {
+        window.switchAuthTab = function(tab) {
             if (tab === 'login') {
                 loginForm.style.display = 'block';
                 registerForm.style.display = 'none';
@@ -1017,9 +1000,9 @@
                 tabLoginBtn.classList.remove('active');
                 tabRegisterBtn.classList.add('active');
             }
-        }
+        };
 
-        function handleRegister(e) {
+        window.handleRegister = function(e) {
             e.preventDefault();
             const email = document.getElementById('regEmail').value.trim();
             const password = document.getElementById('regPassword').value;
@@ -1042,9 +1025,9 @@
             alert("Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.");
             switchAuthTab('login');
             registerForm.reset();
-        }
+        };
 
-        function handleLogin(e) {
+        window.handleLogin = function(e) {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value;
@@ -1059,16 +1042,16 @@
             } else {
                 alert("Sai Email hoặc mật khẩu!");
             }
-        }
+        };
 
-        function logout() {
+        window.logout = function() {
             currentUser = null;
             updateAuthUI();
             deleteGameBtn.style.display = 'none';
             alert("Đã đăng xuất!");
-        }
+        };
 
-        function addDownloadLinkRow() {
+        window.addDownloadLinkRow = function() {
             const container = document.getElementById('downloadLinksContainer');
             const row = document.createElement('div');
             row.className = 'link-row';
@@ -1082,18 +1065,18 @@
                 <button type="button" onclick="this.parentElement.remove()" style="background: #ef4444; border:none; color:white; padding: 6px 10px; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
             `;
             container.appendChild(row);
-        }
+        };
 
-        function formatText(command, value = null) {
+        window.formatText = function(command, value = null) {
             document.execCommand(command, false, value);
             wpEditor.focus();
-        }
+        };
 
-        function insertImageToEditor() {
+        window.insertImageToEditor = function() {
             document.getElementById('editorImageInput').click();
-        }
+        };
 
-        function handleEditorImageUpload(event) {
+        window.handleEditorImageUpload = function(event) {
             const file = event.target.files[0];
             if (file) {
                 const reader = new FileReader();
@@ -1104,7 +1087,7 @@
                 reader.readAsDataURL(file);
             }
             event.target.value = '';
-        }
+        };
 
         function renderGames(gamesToRender) {
             gameGrid.innerHTML = '';
@@ -1147,9 +1130,8 @@
 
             game.views++;
             try {
-                while (!window.db) { await new Promise(r => setTimeout(r, 100)); }
                 if (game.firestoreId) {
-                    await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
+                    await updateDoc(doc(db, "games", game.firestoreId), {
                         views: game.views
                     });
                 }
@@ -1276,6 +1258,7 @@
             gameDetailView.style.display = 'block';
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+        window.openGameDetail = openGameDetail;
 
         async function deleteGame(gameId) {
             if (!currentUser) {
@@ -1286,10 +1269,9 @@
 
             if (confirm("Bạn có chắc chắn muốn xóa vĩnh viễn bài viết game này không?")) {
                 try {
-                    while (!window.db) { await new Promise(r => setTimeout(r, 100)); }
                     const targetGame = games.find(g => g.id == gameId);
                     if (targetGame && targetGame.firestoreId) {
-                        await window.deleteDoc(window.doc(window.db, "games", targetGame.firestoreId));
+                        await deleteDoc(doc(db, "games", targetGame.firestoreId));
                         alert("Đã xóa bài viết game thành công!");
                         showHome();
                         loadGamesFromFirestore();
@@ -1299,8 +1281,9 @@
                 }
             }
         }
+        window.deleteGame = deleteGame;
 
-        async function rateGame(gameId, starCount) {
+        window.rateGame = async function(gameId, starCount) {
             if (!currentUser) {
                 alert("Bạn cần đăng nhập tài khoản để đánh giá game!");
                 openAuthModal('login');
@@ -1320,9 +1303,8 @@
             }
 
             try {
-                while (!window.db) { await new Promise(r => setTimeout(r, 100)); }
                 if (game.firestoreId) {
-                    await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
+                    await updateDoc(doc(db, "games", game.firestoreId), {
                         ratings: game.ratings
                     });
                 }
@@ -1332,9 +1314,9 @@
 
             alert(`Cảm ơn bạn đã đánh giá ${starCount} sao cho game!`);
             openGameDetail(gameId);
-        }
+        };
 
-        async function submitComment(gameId) {
+        window.submitComment = async function(gameId) {
             if (!currentUser) {
                 alert("Bạn cần đăng nhập tài khoản để bình luận!");
                 openAuthModal('login');
@@ -1364,9 +1346,8 @@
             });
 
             try {
-                while (!window.db) { await new Promise(r => setTimeout(r, 100)); }
                 if (game.firestoreId) {
-                    await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
+                    await updateDoc(doc(db, "games", game.firestoreId), {
                         comments: game.comments
                     });
                 }
@@ -1376,14 +1357,14 @@
 
             contentBox.value = '';
             openGameDetail(gameId);
-        }
+        };
 
-        function showHome() {
+        window.showHome = function() {
             gameDetailView.style.display = 'none';
             homeView.style.display = 'block';
             filterAndRender();
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        };
 
         openUploadModal.addEventListener('click', () => { 
             if (!currentUser) {
@@ -1399,21 +1380,9 @@
             if (e.target === authModal) { authModal.style.display = 'none'; }
         });
 
-        // Xử lý sự kiện Đăng game mới lên Firestore (Đã khắc phục hoàn toàn lỗi chưa kết nối)
-        uploadForm.addEventListener('submit', async (e) => {
+        // Xử lý sự kiện Đăng game mới lên Firestore
+        uploadForm.addEventListener('submit', (e) => {
             e.preventDefault();
-
-            // Chờ tối đa 3 giây để đảm bảo Firebase đã khởi tạo xong nếu mạng chậm
-            let attempts = 0;
-            while (!window.db && attempts < 30) {
-                await new Promise(r => setTimeout(r, 100));
-                attempts++;
-            }
-
-            if (!window.db || !window.addDoc || !window.collection) {
-                alert("Không thể kết nối đến cơ sở dữ liệu Firebase. Vui lòng kiểm tra lại kết nối mạng!");
-                return;
-            }
 
             const imageFileInput = document.getElementById('gameImageFile');
             const file = imageFileInput.files[0];
@@ -1468,7 +1437,7 @@
                 };
 
                 try {
-                    await window.addDoc(window.collection(window.db, "games"), newGame);
+                    await addDoc(collection(db, "games"), newGame);
                     alert("Đăng bài lên website thành công!");
                     uploadForm.reset();
                     wpEditor.innerHTML = '';

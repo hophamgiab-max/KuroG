@@ -12,39 +12,6 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Firebase SDK CDN và Khởi tạo -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-firestore.js";
-
-        const firebaseConfig = {
-          apiKey: "AIzaSyCgu-00ZXILANFFdH9cQ_VrZRaNm-ywA4",
-          authDomain: "kurog-5359b.firebaseapp.com",
-          projectId: "kurog-5359b",
-          storageBucket: "kurog-5359b.appspot.com",
-          messagingSenderId: "260394082482",
-          appId: "1:260394082482:web:8690b9903c7758bffffa9ab",
-          measurementId: "G-4H03KJFZ7G"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // Đưa các hàm và biến Firebase ra phạm vi toàn cục
-        window.db = db;
-        window.collection = collection;
-        window.addDoc = addDoc;
-        window.getDocs = getDocs;
-        window.deleteDoc = deleteDoc;
-        window.doc = doc;
-        window.updateDoc = updateDoc;
-
-        // Tải danh sách game từ Firestore ngay khi trang khởi động
-        if (typeof window.loadGamesFromFirestore === 'function') {
-            window.loadGamesFromFirestore();
-        }
-    </script>
-
     <style>
         :root {
             --bg-color: #0f172a;
@@ -918,6 +885,38 @@
         <p>&copy; 2026 KuroG18. Nền tảng chia sẻ game cộng đồng.</p>
     </footer>
 
+    <!-- Firebase SDK và Logic xử lý gom chung -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-firestore.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyCgu-00ZXILANFFdH9cQ_VrZRaNm-ywA4",
+          authDomain: "kurog-5359b.firebaseapp.com",
+          projectId: "kurog-5359b",
+          storageBucket: "kurog-5359b.appspot.com",
+          messagingSenderId: "260394082482",
+          appId: "1:260394082482:web:8690b9903c7758bffffa9ab",
+          measurementId: "G-4H03KJFZ7G"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.getDocs = getDocs;
+        window.deleteDoc = deleteDoc;
+        window.doc = doc;
+        window.updateDoc = updateDoc;
+
+        // Tải danh sách game ngay khi khởi động
+        if (typeof window.loadGamesFromFirestore === 'function') {
+            window.loadGamesFromFirestore();
+        }
+    </script>
+
     <script>
         let games = [];
         let users = JSON.parse(localStorage.getItem('kuro_users')) || [
@@ -954,7 +953,6 @@
             if (searchInput.value.trim() === '') { searchContainer.classList.remove('active'); }
         });
 
-        // Hàm tải danh sách game từ Cloud Firestore
         async function loadGamesFromFirestore() {
             try {
                 while (!window.db || !window.getDocs) {
@@ -973,7 +971,6 @@
         }
         window.loadGamesFromFirestore = loadGamesFromFirestore;
 
-        // Bật/tắt ẩn hiện mật khẩu
         function togglePasswordVisibility(inputId, btn) {
             const input = document.getElementById(inputId);
             const icon = btn.querySelector('i');
@@ -988,7 +985,6 @@
             }
         }
 
-        // Cập nhật giao diện tài khoản
         function updateAuthUI() {
             if (currentUser) {
                 openAuthModalBtn.style.display = 'none';
@@ -1281,7 +1277,6 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Xóa game trực tiếp từ Firestore
         async function deleteGame(gameId) {
             if (!currentUser) {
                 alert("Bạn cần đăng nhập để thực hiện hành động này!");
@@ -1305,7 +1300,6 @@
             }
         }
 
-        // Đánh giá sao
         async function rateGame(gameId, starCount) {
             if (!currentUser) {
                 alert("Bạn cần đăng nhập tài khoản để đánh giá game!");
@@ -1340,7 +1334,6 @@
             openGameDetail(gameId);
         }
 
-        // Gửi bình luận
         async function submitComment(gameId) {
             if (!currentUser) {
                 alert("Bạn cần đăng nhập tài khoản để bình luận!");
@@ -1406,12 +1399,19 @@
             if (e.target === authModal) { authModal.style.display = 'none'; }
         });
 
-        // Xử lý sự kiện Đăng game mới lên Firestore (Đã sửa lỗi không phản hồi)
+        // Xử lý sự kiện Đăng game mới lên Firestore (Đã khắc phục hoàn toàn lỗi chưa kết nối)
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            // Chờ tối đa 3 giây để đảm bảo Firebase đã khởi tạo xong nếu mạng chậm
+            let attempts = 0;
+            while (!window.db && attempts < 30) {
+                await new Promise(r => setTimeout(r, 100));
+                attempts++;
+            }
+
             if (!window.db || !window.addDoc || !window.collection) {
-                alert("Hệ thống Firebase chưa kết nối xong, vui lòng thử lại sau vài giây!");
+                alert("Không thể kết nối đến cơ sở dữ liệu Firebase. Vui lòng kiểm tra lại kết nối mạng!");
                 return;
             }
 

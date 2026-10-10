@@ -956,8 +956,11 @@
 
         // Hàm tải danh sách game từ Cloud Firestore
         async function loadGamesFromFirestore() {
-            if (!window.db) return;
             try {
+                // Đợi tối đa nếu db chưa khởi tạo kịp
+                while (!window.db || !window.getDocs) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
                 const querySnapshot = await window.getDocs(window.collection(window.db, "games"));
                 games = [];
                 querySnapshot.forEach((docSnap) => {
@@ -1157,7 +1160,8 @@
             // Tăng lượt view và cập nhật trực tiếp lên Firestore
             game.views++;
             try {
-                if (game.firestoreId && window.db) {
+                while (!window.db) { await new Promise(r => setTimeout(r, 100)); }
+                if (game.firestoreId) {
                     await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
                         views: game.views
                     });
@@ -1295,8 +1299,9 @@
 
             if (confirm("Bạn có chắc chắn muốn xóa vĩnh viễn bài viết game này không?")) {
                 try {
+                    while (!window.db) { await new Promise(r => setTimeout(r, 100)); }
                     const targetGame = games.find(g => g.id == gameId);
-                    if (targetGame && targetGame.firestoreId && window.db) {
+                    if (targetGame && targetGame.firestoreId) {
                         await window.deleteDoc(window.doc(window.db, "games", targetGame.firestoreId));
                         alert("Đã xóa bài viết game thành công!");
                         showHome();
@@ -1329,7 +1334,8 @@
             }
 
             try {
-                if (game.firestoreId && window.db) {
+                while (!window.db) { await new Promise(r => setTimeout(r, 100)); }
+                if (game.firestoreId) {
                     await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
                         ratings: game.ratings
                     });
@@ -1345,7 +1351,7 @@
         // Gửi bình luận (Cập nhật lên Firestore)
         async function submitComment(gameId) {
             if (!currentUser) {
-                alert("You need to log in to comment!");
+                alert("Bạn cần đăng nhập tài khoản để bình luận!");
                 openAuthModal('login');
                 return;
             }
@@ -1373,7 +1379,8 @@
             });
 
             try {
-                if (game.firestoreId && window.db) {
+                while (!window.db) { await new Promise(r => setTimeout(r, 100)); }
+                if (game.firestoreId) {
                     await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
                         comments: game.comments
                     });
@@ -1447,16 +1454,17 @@
                     };
 
                     try {
-                        if (window.db && window.addDoc && window.collection) {
-                            await window.addDoc(window.collection(window.db, "games"), newGame);
-                            alert("Đăng bài lên đám mây thành công!");
-                            uploadForm.reset();
-                            wpEditor.innerHTML = '';
-                            uploadModal.style.display = 'none';
-                            loadGamesFromFirestore();
-                        } else {
-                            alert("Firebase chưa sẵn sàng, vui lòng thử lại sau giây lát.");
+                        // Đợi tối đa cho tới khi Firebase sẵn sàng
+                        while (!window.db || !window.addDoc || !window.collection) {
+                            await new Promise(r => setTimeout(r, 100));
                         }
+                        
+                        await window.addDoc(window.collection(window.db, "games"), newGame);
+                        alert("Đăng bài lên đám mây thành công!");
+                        uploadForm.reset();
+                        wpEditor.innerHTML = '';
+                        uploadModal.style.display = 'none';
+                        loadGamesFromFirestore();
                     } catch (error) {
                         alert("Lỗi khi đăng game: " + error.message);
                     }

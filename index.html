@@ -12,6 +12,39 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Firebase SDK CDN và Khởi tạo -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-firestore.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyCgu-00ZXILANFFdH9cQ_VrZRaNm-ywA4",
+          authDomain: "kurog-5359b.firebaseapp.com",
+          projectId: "kurog-5359b",
+          storageBucket: "kurog-5359baspectstorage.app",
+          messagingSenderId: "260394082482",
+          appId: "1:260394082482:web:8690b9903c7758bffffa9ab",
+          measurementId: "G-4H03KJFZ7G"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Đưa các hàm và biến Firebase ra phạm vi toàn cục
+        window.db = db;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.getDocs = getDocs;
+        window.deleteDoc = deleteDoc;
+        window.doc = doc;
+        window.updateDoc = updateDoc;
+
+        // Tải danh sách game từ Firestore ngay khi trang khởi động
+        if (typeof window.loadGamesFromFirestore === 'function') {
+            window.loadGamesFromFirestore();
+        }
+    </script>
+
     <style>
         :root {
             --bg-color: #0f172a;
@@ -768,7 +801,7 @@
             <div class="back-nav-row">
                 <button class="back-btn" onclick="showHome()"><i class="fa-solid fa-arrow-left"></i> Quay lại trang chủ</button>
                 <!-- Nút Xóa Game (Chỉ Admin mới thấy) -->
-                <button class="btn btn-danger" id="deleteGameBtn" style="display: none;" onclick=""><i class="fa-solid fa-trash"></i> Xóa Bài Viết</button>
+                <button class="btn btn-danger" id="deleteGameBtn" style="display: none;"><i class="fa-solid fa-trash"></i> Xóa Bài Viết</button>
             </div>
             <div class="detail-wrapper" id="detailWrapper" style="margin-top: 1rem;"></div>
         </div>
@@ -886,7 +919,7 @@
     </footer>
 
     <script>
-        let games = JSON.parse(localStorage.getItem('kuro_games')) || [];
+        let games = [];
         let users = JSON.parse(localStorage.getItem('kuro_users')) || [
             { email: "admin@gmail.com", password: "1234567890!@#$%^&*()", role: "admin" }
         ];
@@ -920,6 +953,23 @@
         searchInput.addEventListener('blur', () => {
             if (searchInput.value.trim() === '') { searchContainer.classList.remove('active'); }
         });
+
+        // Hàm tải danh sách game từ Cloud Firestore
+        async function loadGamesFromFirestore() {
+            if (!window.db) return;
+            try {
+                const querySnapshot = await window.getDocs(window.collection(window.db, "games"));
+                games = [];
+                querySnapshot.forEach((docSnap) => {
+                    games.push({ firestoreId: docSnap.id, ...docSnap.data() });
+                });
+                games.sort((a, b) => b.id - a.id);
+                filterAndRender();
+            } catch (error) {
+                console.error("Lỗi khi tải game từ Firestore: ", error);
+            }
+        }
+        window.loadGamesFromFirestore = loadGamesFromFirestore;
 
         // Bật/tắt ẩn hiện mật khẩu
         function togglePasswordVisibility(inputId, btn) {
@@ -1100,14 +1150,22 @@
             });
         }
 
-        function openGameDetail(id) {
-            const game = games.find(g => g.id === id);
+        async function openGameDetail(id) {
+            const game = games.find(g => g.id == id);
             if (!game) return;
 
+            // Tăng lượt view và cập nhật trực tiếp lên Firestore
             game.views++;
-            localStorage.setItem('kuro_games', JSON.stringify(games));
+            try {
+                if (game.firestoreId && window.db) {
+                    await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
+                        views: game.views
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
 
-            // Hiển thị hoặc ẩn nút Xóa Game tùy thuộc vào quyền Admin
             if (currentUser && currentUser.role === 'admin') {
                 deleteGameBtn.style.display = 'inline-flex';
                 deleteGameBtn.onclick = () => deleteGame(game.id);
@@ -1126,7 +1184,6 @@
             let downloadBoxesHTML = '';
             for (let platform in groupedLinks) {
                 let serversHTML = groupedLinks[platform].map(s => `<a href="${s.url}" target="_blank" class="server-link-item">${s.name}</a>`).join(' | ');
-                
                 downloadBoxesHTML += `
                     <div class="download-group">
                         <div class="download-group-title">${platform}: ${serversHTML}</div>
@@ -1181,7 +1238,6 @@
                 </div>
 
                 <div class="detail-card">
-                    <!-- 1. Đánh giá sao -->
                     <div>
                         <h3 class="detail-section-title">Đánh Giá Game (Tối Đa 5 Sao)</h3>
                         <div class="rating-box">
@@ -1197,13 +1253,11 @@
                         </div>
                     </div>
 
-                    <!-- 2. Nội dung bài viết / Giới thiệu -->
                     <div>
                         <h3 class="detail-section-title">Nội Dung Giới Thiệu</h3>
                         <div class="wp-content">${game.fullHtmlContent}</div>
                     </div>
 
-                    <!-- 3. Phần Tải Xuống -->
                     <div>
                         <h3 class="detail-section-title">Phần Tải Xuống</h3>
                         <div class="download-container">
@@ -1212,7 +1266,6 @@
                         </div>
                     </div>
 
-                    <!-- 4. Bình luận -->
                     <div>
                         <h3 class="detail-section-title">Bình Luận (${game.comments.length})</h3>
                         <div class="comments-section">
@@ -1233,30 +1286,37 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Chức năng xóa game dành riêng cho Admin
-        function deleteGame(gameId) {
+        // Xóa game trực tiếp từ Firestore
+        async function deleteGame(gameId) {
             if (!currentUser || currentUser.role !== 'admin') {
                 alert("Bạn không có quyền thực hiện hành động này!");
                 return;
             }
 
             if (confirm("Bạn có chắc chắn muốn xóa vĩnh viễn bài viết game này không?")) {
-                games = games.filter(g => g.id !== gameId);
-                localStorage.setItem('kuro_games', JSON.stringify(games));
-                alert("Đã xóa bài viết game thành công!");
-                showHome();
+                try {
+                    const targetGame = games.find(g => g.id == gameId);
+                    if (targetGame && targetGame.firestoreId && window.db) {
+                        await window.deleteDoc(window.doc(window.db, "games", targetGame.firestoreId));
+                        alert("Đã xóa bài viết game thành công!");
+                        showHome();
+                        loadGamesFromFirestore();
+                    }
+                } catch (error) {
+                    alert("Lỗi khi xóa game: " + error.message);
+                }
             }
         }
 
-        // Chức năng đánh giá sao
-        function rateGame(gameId, starCount) {
+        // Đánh giá sao (Cập nhật lên Firestore)
+        async function rateGame(gameId, starCount) {
             if (!currentUser) {
                 alert("Bạn cần đăng nhập tài khoản để đánh giá game!");
                 openAuthModal('login');
                 return;
             }
 
-            const game = games.find(g => g.id === gameId);
+            const game = games.find(g => g.id == gameId);
             if (!game) return;
 
             if (!game.ratings) game.ratings = [];
@@ -1268,15 +1328,24 @@
                 game.ratings.push({ userEmail: currentUser.email, star: starCount });
             }
 
-            localStorage.setItem('kuro_games', JSON.stringify(games));
+            try {
+                if (game.firestoreId && window.db) {
+                    await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
+                        ratings: game.ratings
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+
             alert(`Cảm ơn bạn đã đánh giá ${starCount} sao cho game!`);
             openGameDetail(gameId);
         }
 
-        // Chức năng gửi bình luận
-        function submitComment(gameId) {
+        // Gửi bình luận (Cập nhật lên Firestore)
+        async function submitComment(gameId) {
             if (!currentUser) {
-                alert("Bạn cần đăng nhập tài khoản để gửi bình luận!");
+                alert("You need to log in to comment!");
                 openAuthModal('login');
                 return;
             }
@@ -1289,7 +1358,7 @@
                 return;
             }
 
-            const game = games.find(g => g.id === gameId);
+            const game = games.find(g => g.id == gameId);
             if (!game) return;
 
             if (!game.comments) game.comments = [];
@@ -1303,7 +1372,16 @@
                 date: dateStr
             });
 
-            localStorage.setItem('kuro_games', JSON.stringify(games));
+            try {
+                if (game.firestoreId && window.db) {
+                    await window.updateDoc(window.doc(window.db, "games", game.firestoreId), {
+                        comments: game.comments
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+
             contentBox.value = '';
             openGameDetail(gameId);
         }
@@ -1322,6 +1400,7 @@
             if (e.target === authModal) { authModal.style.display = 'none'; }
         });
 
+        // Đăng game mới lên Firestore
         uploadForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const imageFileInput = document.getElementById('gameImageFile');
@@ -1329,7 +1408,7 @@
 
             if (file) {
                 const reader = new FileReader();
-                reader.onload = function(event) {
+                reader.onload = async function(event) {
                     const mainImageBase64 = event.target.result;
                     const htmlContent = wpEditor.innerHTML;
                     
@@ -1367,12 +1446,20 @@
                         comments: []
                     };
 
-                    games.unshift(newGame);
-                    localStorage.setItem('kuro_games', JSON.stringify(games));
-                    filterAndRender();
-                    uploadForm.reset();
-                    wpEditor.innerHTML = '';
-                    uploadModal.style.display = 'none';
+                    try {
+                        if (window.db && window.addDoc && window.collection) {
+                            await window.addDoc(window.collection(window.db, "games"), newGame);
+                            alert("Đăng bài lên đám mây thành công!");
+                            uploadForm.reset();
+                            wpEditor.innerHTML = '';
+                            uploadModal.style.display = 'none';
+                            loadGamesFromFirestore();
+                        } else {
+                            alert("Firebase chưa sẵn sàng, vui lòng thử lại sau giây lát.");
+                        }
+                    } catch (error) {
+                        alert("Lỗi khi đăng game: " + error.message);
+                    }
                 };
                 reader.readAsDataURL(file);
             }
@@ -1390,7 +1477,6 @@
 
         // Chạy khởi tạo ban đầu
         updateAuthUI();
-        renderGames(games);
     </script>
 </body>
 

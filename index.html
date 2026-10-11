@@ -5,6 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KuroG18 - Khám Phá & Tải Game Hay</title>
+    
+    <!-- Mã quảng cáo Adsterra (OnClick) -->
+    <script>(function(s){s.dataset.zone='12005148',s.src='https://al5sm.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
+
+    <!-- Mã quảng cáo Adsterra (Push Notification) -->
+    <script src="https://5gvci.com/act/files/tag.min.js?z=12005181" data-cfasync="false" async></script>
+
     <!-- Icon logo hiển thị trực tiếp trên tab trình duyệt -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%23f43f5e%22/><text x=%2250%%22 y=%2255%%22 font-size=%2245%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22sans-serif%22>R18</text></svg>" type="image/svg+xml">
     
@@ -1296,7 +1303,7 @@
                 return;
             }
 
-            if (confirm("Bạn có chắc chắn muốn xóa vĩnh viễn bài viết game này không?")) {
+            if (confirm("Hành động này sẽ xóa vĩnh viễn bài viết game. Bạn có chắc chắn không?")) {
                 try {
                     const targetGame = games.find(g => g.id == gameId);
                     if (targetGame && targetGame.firestoreId) {

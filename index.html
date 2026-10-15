@@ -441,6 +441,37 @@
             color: var(--accent-hover);
         }
 
+        /* Khung hiển thị Video hướng dẫn */
+        .video-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background-color: var(--bg-color);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .video-responsive-wrapper {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* Tỷ lệ 16:9 chuẩn */
+            height: 0;
+            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: #000;
+        }
+
+        .video-responsive-wrapper video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
         /* Phần Đánh Giá Sao & Bình Luận */
         .rating-box {
             display: flex;
@@ -749,7 +780,10 @@
             <input type="text" id="searchInput" placeholder="Tìm kiếm game...">
         </div>
         <div class="nav-actions">
-            <!-- Nút Đăng Game Mới (Mặc định ẩn, chỉ hiện khi đăng nhập admin) -->
+            <!-- Nút Quản Lý Bài Đăng (Chỉ hiện khi là Admin) -->
+            <button class="btn btn-outline" id="openManageModalBtn" onclick="openManageModal()" style="display: none;"><i class="fa-solid fa-list-check"></i> Quản Lý Bài</button>
+
+            <!-- Nút Đăng Game Mới (Chỉ hiện khi là Admin) -->
             <button class="btn btn-primary" id="openUploadModal" onclick="openUploadModalFunc()" style="display: none;"><i class="fa-solid fa-plus"></i> Đăng Game Mới</button>
             
             <!-- Khu vực tài khoản (Chưa đăng nhập) -->
@@ -840,7 +874,7 @@
 
     <!-- Modal Đăng Game -->
     <div class="modal" id="uploadModal">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
             <button class="close-btn" id="closeModal"><i class="fa-solid fa-xmark"></i></button>
             <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Đăng Tải Game & Quản Lý Link</h2>
             <form id="uploadForm">
@@ -870,6 +904,13 @@
                     <button type="button" class="btn" onclick="addDownloadLinkRow()" style="margin-top: 8px; background: #334155; font-size: 0.85rem; padding: 0.4rem 0.8rem;"><i class="fa-solid fa-plus"></i> Thêm Link Server Khác</button>
                 </div>
 
+                <!-- Tải Video Hướng Dẫn Trực Tiếp Từ Máy Tính -->
+                <div class="form-group">
+                    <label>Tải Lên Video Hướng Dẫn Tải & Cài Đặt (Từ máy tính)</label>
+                    <input type="file" id="tutorialVideoFile" accept="video/mp4,video/webm,video/ogg">
+                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">Hỗ trợ định dạng MP4, WebM (Khuyên dùng video ngắn hoặc dung lượng nhẹ để tải nhanh lên Firestore).</small>
+                </div>
+
                 <!-- Trình soạn thảo -->
                 <div class="form-group">
                     <label>Nội dung bài viết / Giới thiệu chi tiết</label>
@@ -884,6 +925,63 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; font-size: 1rem;">Đăng Bài Lên Website</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Quản Lý Danh Sách Bài Đăng (Admin) -->
+    <div class="modal" id="manageModal">
+        <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+            <button class="close-btn" onclick="closeManageModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h2 style="margin-bottom: 1.5rem; font-size: 1.3rem; color: var(--accent-color);"><i class="fa-solid fa-list-check"></i> Quản Lý Bài Đăng</h2>
+            <div id="manageGameList" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Danh sách bài đăng sẽ được render bằng JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Chỉnh Sửa Bài Viết -->
+    <div class="modal" id="editModal">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <button class="close-btn" onclick="closeEditModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h2 style="margin-bottom: 1.5rem; font-size: 1.5rem;">Chỉnh Sửa Bài Viết Game</h2>
+            <form id="editForm" onsubmit="handleEditSubmit(event)">
+                <input type="hidden" id="editFirestoreId">
+                <input type="hidden" id="editGameId">
+                <div class="form-group">
+                    <label>Tên Game</label>
+                    <input type="text" id="editGameTitle" required>
+                </div>
+                <div class="form-group">
+                    <label>Ảnh Thumbnail Mới (Để trống nếu muốn giữ nguyên ảnh cũ)</label>
+                    <input type="file" id="editGameImageFile" accept="image/*">
+                </div>
+
+                <!-- Danh Sách Link Tải Sửa -->
+                <div class="form-group">
+                    <label>Danh Sách Link Tải</label>
+                    <div id="editDownloadLinksContainer"></div>
+                    <button type="button" class="btn" onclick="addEditDownloadLinkRow()" style="margin-top: 8px; background: #334155; font-size: 0.85rem; padding: 0.4rem 0.8rem;"><i class="fa-solid fa-plus"></i> Thêm Link Server Khác</button>
+                </div>
+
+                <!-- Sửa Video Hướng Dẫn Tải Lên -->
+                <div class="form-group">
+                    <label>Video Hướng Dẫn Mới (Để trống nếu giữ nguyên video cũ)</label>
+                    <input type="file" id="editTutorialVideoFile" accept="video/mp4,video/webm,video/ogg">
+                </div>
+
+                <!-- Trình soạn thảo sửa -->
+                <div class="form-group">
+                    <label>Nội dung bài viết chi tiết</label>
+                    <div class="editor-toolbar">
+                        <button type="button" class="toolbar-btn" onclick="formatEditText('bold')"><i class="fa-solid fa-bold"></i> Đậm</button>
+                        <button type="button" class="toolbar-btn" onclick="formatEditText('italic')"><i class="fa-solid fa-italic"></i> Nghiêng</button>
+                        <button type="button" class="toolbar-btn" onclick="formatEditText('formatBlock', 'H2')"><i class="fa-solid fa-heading"></i> H2</button>
+                    </div>
+                    <div id="editWpEditor" class="editor-content-area" contenteditable="true"></div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; font-size: 1rem;">Lưu Thay Đổi</button>
             </form>
         </div>
     </div>
@@ -940,6 +1038,11 @@
         const tabLoginBtn = document.getElementById('tabLoginBtn');
         const tabRegisterBtn = document.getElementById('tabRegisterBtn');
 
+        const manageModal = document.getElementById('manageModal');
+        const editModal = document.getElementById('editModal');
+        const openManageModalBtn = document.getElementById('openManageModalBtn');
+        const editWpEditor = document.getElementById('editWpEditor');
+
         searchInput.addEventListener('focus', () => { searchContainer.classList.add('active'); });
         searchInput.addEventListener('blur', () => {
             if (searchInput.value.trim() === '') { searchContainer.classList.remove('active'); }
@@ -981,16 +1084,18 @@
                 userAccountSection.style.display = 'flex';
                 userNameDisplay.textContent = currentUser.email.split('@')[0];
                 
-                // Chỉ hiện nút Đăng Game Mới khi tài khoản là Admin
                 if (currentUser.role === 'admin') {
                     openUploadModal.style.display = 'inline-flex';
+                    if (openManageModalBtn) openManageModalBtn.style.display = 'inline-flex';
                 } else {
                     openUploadModal.style.display = 'none';
+                    if (openManageModalBtn) openManageModalBtn.style.display = 'none';
                 }
             } else {
                 openAuthModalBtn.style.display = 'inline-flex';
                 userAccountSection.style.display = 'none';
-                openUploadModal.style.display = 'none'; // Ẩn khi chưa đăng nhập
+                openUploadModal.style.display = 'none';
+                if (openManageModalBtn) openManageModalBtn.style.display = 'none';
             }
         }
 
@@ -1074,6 +1179,207 @@
             uploadModal.style.display = 'flex';
         };
 
+        window.openManageModal = function() {
+            if (!currentUser || currentUser.role !== 'admin') return;
+            manageModal.style.display = 'flex';
+            renderManageGameList();
+        };
+
+        window.closeManageModal = function() {
+            manageModal.style.display = 'none';
+        };
+
+        window.closeEditModal = function() {
+            editModal.style.display = 'none';
+        };
+
+        function renderManageGameList() {
+            const listContainer = document.getElementById('manageGameList');
+            listContainer.innerHTML = '';
+
+            if (games.length === 0) {
+                listContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Chưa có bài viết nào.</p>`;
+                return;
+            }
+
+            games.forEach(game => {
+                const item = document.createElement('div');
+                item.style.cssText = "display: flex; align-items: center; justify-content: space-between; background: var(--bg-color); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border-color);";
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                        <img src="${game.image}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
+                        <span style="font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;">${game.title}</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openEditModal('${game.firestoreId}')"><i class="fa-solid fa-pen-to-square"></i> Sửa</button>
+                        <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;" onclick="deleteGameFromManage('${game.firestoreId}')"><i class="fa-solid fa-trash"></i> Xóa</button>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        window.openEditModal = function(firestoreId) {
+            const game = games.find(g => g.firestoreId === firestoreId);
+            if (!game) return;
+
+            document.getElementById('editFirestoreId').value = game.firestoreId;
+            document.getElementById('editGameId').value = game.id;
+            document.getElementById('editGameTitle').value = game.title;
+            editWpEditor.innerHTML = game.fullHtmlContent || '';
+
+            const linksContainer = document.getElementById('editDownloadLinksContainer');
+            linksContainer.innerHTML = '';
+            if (game.downloadLinks && game.downloadLinks.length > 0) {
+                game.downloadLinks.forEach(link => {
+                    const row = document.createElement('div');
+                    row.className = 'link-row edit-link-row';
+                    row.innerHTML = `
+                        <select class="platform-select" style="width: 25%;">
+                            <option value="Bản PC" ${link.platform === 'Bản PC' ? 'selected' : ''}>Bản PC</option>
+                            <option value="Bản Android" ${link.platform === 'Bản Android' ? 'selected' : ''}>Bản Android</option>
+                        </select>
+                        <input type="text" class="server-name" value="${link.name}" placeholder="Tên server" style="width: 25%;" required>
+                        <input type="url" class="server-url" value="${link.url}" placeholder="URL" style="width: 40%;" required>
+                        <button type="button" onclick="this.parentElement.remove()" style="background: #ef4444; border:none; color:white; padding: 6px 10px; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+                    `;
+                    linksContainer.appendChild(row);
+                });
+            }
+
+            manageModal.style.display = 'none';
+            editModal.style.display = 'flex';
+        };
+
+        window.addEditDownloadLinkRow = function() {
+            const container = document.getElementById('editDownloadLinksContainer');
+            const row = document.createElement('div');
+            row.className = 'link-row edit-link-row';
+            row.innerHTML = `
+                <select class="platform-select" style="width: 25%;">
+                    <option value="Bản PC">Bản PC</option>
+                    <option value="Bản Android">Bản Android</option>
+                </select>
+                <input type="text" class="server-name" placeholder="Tên server" style="width: 25%;" required>
+                <input type="url" class="server-url" placeholder="Đường dẫn https://..." style="width: 40%;" required>
+                <button type="button" onclick="this.parentElement.remove()" style="background: #ef4444; border:none; color:white; padding: 6px 10px; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+            `;
+            container.appendChild(row);
+        };
+
+        window.formatEditText = function(command, value = null) {
+            document.execCommand(command, false, value);
+            editWpEditor.focus();
+        };
+
+        window.handleEditSubmit = async function(e) {
+            e.preventDefault();
+            if (!currentUser || currentUser.role !== 'admin') return;
+
+            const firestoreId = document.getElementById('editFirestoreId').value;
+            const title = document.getElementById('editGameTitle').value;
+            const htmlContent = editWpEditor.innerHTML;
+            const imageFileInput = document.getElementById('editGameImageFile');
+            const videoFileInput = document.getElementById('editTutorialVideoFile');
+
+            let linksArray = [];
+            document.querySelectorAll('.edit-link-row').forEach(row => {
+                const platform = row.querySelector('.platform-select').value;
+                const name = row.querySelector('.server-name').value;
+                const url = row.querySelector('.server-url').value;
+                if(name && url) {
+                    linksArray.push({ platform, name, url });
+                }
+            });
+
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlContent;
+            const plainTextDesc = tempDiv.textContent || tempDiv.innerText || "";
+            const shortDesc = plainTextDesc.substring(0, 100) + '...';
+
+            const updateData = {
+                title: title,
+                fullHtmlContent: htmlContent,
+                shortDesc: shortDesc,
+                downloadLinks: linksArray
+            };
+
+            const processAndSave = async (finalImg, finalVid) => {
+                if (finalImg) updateData.image = finalImg;
+                if (finalVid) updateData.tutorialVideo = finalVid;
+
+                try {
+                    await updateDoc(doc(db, "games", firestoreId), updateData);
+                    alert("Cập nhật bài viết thành công!");
+                    editModal.style.display = 'none';
+                    loadGamesFromFirestore();
+                } catch (err) {
+                    alert("Lỗi khi cập nhật: " + err.message);
+                }
+            };
+
+            // Đọc file ảnh mới (nếu có)
+            let newImageBase64 = null;
+            let newVideoBase64 = null;
+
+            const checkAndSave = () => {
+                processAndSave(newImageBase64, newVideoBase64);
+            };
+
+            if (imageFileInput.files && imageFileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 600;
+                        const scaleSize = MAX_WIDTH / img.width;
+                        canvas.width = scaleSize < 1 ? MAX_WIDTH : img.width;
+                        canvas.height = scaleSize < 1 ? img.height * scaleSize : img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        newImageBase64 = canvas.toDataURL('image/jpeg', 0.75);
+
+                        if (videoFileInput.files && videoFileInput.files[0]) {
+                            const vReader = new FileReader();
+                            vReader.onload = function(ve) {
+                                newVideoBase64 = ve.target.result;
+                                checkAndSave();
+                            };
+                            vReader.readAsDataURL(videoFileInput.files[0]);
+                        } else {
+                            checkAndSave();
+                        }
+                    };
+                };
+                reader.readAsDataURL(imageFileInput.files[0]);
+            } else if (videoFileInput.files && videoFileInput.files[0]) {
+                const vReader = new FileReader();
+                vReader.onload = function(ve) {
+                    newVideoBase64 = ve.target.result;
+                    checkAndSave();
+                };
+                vReader.readAsDataURL(videoFileInput.files[0]);
+            } else {
+                checkAndSave();
+            }
+        };
+
+        window.deleteGameFromManage = async function(firestoreId) {
+            if (!currentUser || currentUser.role !== 'admin') return;
+            if (confirm("Bạn có chắc chắn muốn xóa bài viết này vĩnh viễn không?")) {
+                try {
+                    await deleteDoc(doc(db, "games", firestoreId));
+                    alert("Đã xóa bài viết thành công!");
+                    loadGamesFromFirestore();
+                    manageModal.style.display = 'none';
+                } catch (err) {
+                    alert("Lỗi khi xóa: " + err.message);
+                }
+            }
+        };
+
         window.addDownloadLinkRow = function() {
             const container = document.getElementById('downloadLinksContainer');
             const row = document.createElement('div');
@@ -1136,7 +1442,7 @@
             gamesToRender.forEach(game => {
                 const card = document.createElement('div');
                 card.className = 'game-card';
-                card.onclick = () => openGameDetail(game.id);
+                card.onclick = () => handleGameClick(game.id);
 
                 let avgRating = 0;
                 if (game.ratings && game.ratings.length > 0) {
@@ -1159,6 +1465,18 @@
                 `;
                 gameGrid.appendChild(card);
             });
+        }
+
+        function handleGameClick(id) {
+            const adKey = `ad_visited_game_${id}`;
+            const hasVisited = sessionStorage.getItem(adKey);
+
+            if (!hasVisited) {
+                sessionStorage.setItem(adKey, 'true');
+                window.open('https://uplcm.com/4/12005179', '_blank');
+            }
+
+            openGameDetail(id);
         }
 
         async function openGameDetail(id) {
@@ -1184,12 +1502,14 @@
             }
 
             let groupedLinks = {};
-            game.downloadLinks.forEach(item => {
-                if (!groupedLinks[item.platform]) {
-                    groupedLinks[item.platform] = [];
-                }
-                groupedLinks[item.platform].push(item);
-            });
+            if (game.downloadLinks) {
+                game.downloadLinks.forEach(item => {
+                    if (!groupedLinks[item.platform]) {
+                        groupedLinks[item.platform] = [];
+                    }
+                    groupedLinks[item.platform].push(item);
+                });
+            }
 
             let downloadBoxesHTML = '';
             for (let platform in groupedLinks) {
@@ -1197,6 +1517,24 @@
                 downloadBoxesHTML += `
                     <div class="download-group">
                         <div class="download-group-title">${platform}: ${serversHTML}</div>
+                    </div>
+                `;
+            }
+
+            // Tạo phần hiển thị Video hướng dẫn tải lên từ máy tính
+            let videoSectionHTML = '';
+            if (game.tutorialVideo) {
+                videoSectionHTML = `
+                    <div>
+                        <h3 class="detail-section-title">Video Hướng Dẫn Tải & Cài Đặt</h3>
+                        <div class="video-container">
+                            <div class="video-responsive-wrapper">
+                                <video controls preload="metadata">
+                                    <source src="${game.tutorialVideo}" type="video/mp4">
+                                    Trình duyệt của bạn không hỗ trợ thẻ video.
+                                </video>
+                            </div>
+                        </div>
                     </div>
                 `;
             }
@@ -1275,6 +1613,8 @@
                             ${downloadBoxesHTML}
                         </div>
                     </div>
+
+                    ${videoSectionHTML}
 
                     <div>
                         <h3 class="detail-section-title">Bình Luận (${game.comments.length})</h3>
@@ -1406,9 +1746,11 @@
         window.addEventListener('click', (e) => { 
             if (e.target === uploadModal) { uploadModal.style.display = 'none'; }
             if (e.target === authModal) { authModal.style.display = 'none'; }
+            if (e.target === manageModal) { manageModal.style.display = 'none'; }
+            if (e.target === editModal) { editModal.style.display = 'none'; }
         });
 
-        // Xử lý sự kiện Đăng game mới lên Firestore
+        // Xử lý sự kiện Đăng game mới lên Firestore (bao gồm upload video từ máy)
         uploadForm.addEventListener('submit', (e) => {
             e.preventDefault();
 
@@ -1418,6 +1760,7 @@
             }
 
             const imageFileInput = document.getElementById('gameImageFile');
+            const videoFileInput = document.getElementById('tutorialVideoFile');
             const file = imageFileInput.files[0];
 
             if (!file) {
@@ -1443,7 +1786,7 @@
                     const htmlContent = wpEditor.innerHTML;
                     
                     let linksArray = [];
-                    const linkRows = document.querySelectorAll('.link-row');
+                    const linkRows = document.querySelectorAll('#downloadLinksContainer .link-row');
                     linkRows.forEach(row => {
                         const platform = row.querySelector('.platform-select').value;
                         const name = row.querySelector('.server-name').value;
@@ -1463,29 +1806,44 @@
                     const year = now.getFullYear();
                     const formattedDate = `${day}/${month}/${year}`;
 
-                    const newGame = {
-                        id: Date.now(),
-                        title: document.getElementById('gameTitle').value,
-                        image: mainImageBase64,
-                        downloadLinks: linksArray,
-                        shortDesc: plainTextDesc.substring(0, 100) + '...',
-                        fullHtmlContent: htmlContent,
-                        views: 0,
-                        uploadDate: formattedDate,
-                        ratings: [],
-                        comments: []
+                    const saveGameToFirestore = async (videoBase64 = '') => {
+                        const newGame = {
+                            id: Date.now(),
+                            title: document.getElementById('gameTitle').value,
+                            image: mainImageBase64,
+                            downloadLinks: linksArray,
+                            tutorialVideo: videoBase64,
+                            shortDesc: plainTextDesc.substring(0, 100) + '...',
+                            fullHtmlContent: htmlContent,
+                            views: 0,
+                            uploadDate: formattedDate,
+                            ratings: [],
+                            comments: []
+                        };
+
+                        try {
+                            await addDoc(collection(db, "games"), newGame);
+                            alert("Đăng bài lên website thành công!");
+                            uploadForm.reset();
+                            wpEditor.innerHTML = '';
+                            uploadModal.style.display = 'none';
+                            loadGamesFromFirestore();
+                        } catch (error) {
+                            console.error("Lỗi khi đăng game:", error);
+                            alert("Lỗi khi đăng game: " + error.message);
+                        }
                     };
 
-                    try {
-                        await addDoc(collection(db, "games"), newGame);
-                        alert("Đăng bài lên website thành công!");
-                        uploadForm.reset();
-                        wpEditor.innerHTML = '';
-                        uploadModal.style.display = 'none';
-                        loadGamesFromFirestore();
-                    } catch (error) {
-                        console.error("Lỗi khi đăng game:", error);
-                        alert("Lỗi khi đăng game: " + error.message);
+                    // Kiểm tra nếu có chọn file video hướng dẫn từ máy tính
+                    if (videoFileInput.files && videoFileInput.files[0]) {
+                        const videoFile = videoFileInput.files[0];
+                        const videoReader = new FileReader();
+                        videoReader.onload = function(ve) {
+                            saveGameToFirestore(ve.target.result);
+                        };
+                        videoReader.readAsDataURL(videoFile);
+                    } else {
+                        saveGameToFirestore('');
                     }
                 };
             };
